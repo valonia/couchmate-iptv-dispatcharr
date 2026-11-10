@@ -450,6 +450,8 @@ ${rows ? `<section class="card wide"><h3>Channels with the most filled in</h3><d
     keys: { ok: 'pause', up: 'info', down: 'settings', left: 'seek_back', right: 'seek_forward' },
     settings: [{ type: 'audio', title: api.t('Audio') }, { type: 'subtitles', title: api.t('Subtitles') }],
   };
+  // Episodes: "next episode" shows 10 s before the end; the apps buffer it meanwhile and it follows straight on.
+  const EPISODE_PLAYER = { ...VOD_PLAYER, upNextBefore: 10 };
 
   api.source({
     name: 'IPTV',
@@ -540,7 +542,7 @@ ${rows ? `<section class="card wide"><h3>Channels with the most filled in</h3><d
         return {
           url: streamUrl('series', m[1], m[2]), type: 'file', live: false, kind: 'episode',
           title: info?.title, subtitle: e ? [e.label, e.name].filter(Boolean).join(' · ') : undefined, image: e?.image || info?.image,
-          player: VOD_PLAYER,
+          player: EPISODE_PLAYER,
         };
       }
       throw new Error('Unknown item');
