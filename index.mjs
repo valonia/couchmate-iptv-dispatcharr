@@ -296,7 +296,7 @@ export default function setup(api) {
       if (!x) return { seen: false, started: false, position: 0, duration: e.duration || 0, at: 0 };
       const duration = x.duration || e.duration || 0;
       const seen = x.finished || (duration > 0 && duration - x.position <= Math.min(300, duration * 0.08));
-      return { seen, started: !seen && x.position >= 30, position: Math.round(x.position), duration, at: x.at || 0 };
+      return { seen, started: !seen && x.position >= 30, position: Math.round(x.position), duration, at: x.at || 0, by: x.by || null };
     };
     return {
       of,
@@ -525,7 +525,14 @@ ${rows ? `<section class="card wide"><h3>Channels with the most filled in</h3><d
           else if (p.started) {
             it.resume = p.position; // OK on it carries on where you were
             it.resumeLabel = clock(p.position);
-            if (p.duration) it.progress = Math.min(1, p.position / p.duration).toFixed(3);
+            if (p.duration) {
+              it.progress = Math.min(1, p.position / p.duration).toFixed(3);
+              // Like the history: "29 min remaining", who started it and when.
+              const left = Math.max(1, Math.round((p.duration - p.position) / 60));
+              it.left = left >= 60 ? api.t('{h} h {m} min remaining', { h: Math.floor(left / 60), m: left % 60 }) : api.t('{m} min remaining', { m: left });
+            }
+            if (p.by) it.startedBy = api.t('{name} started it', { name: p.by });
+            if (p.at) it.lastAt = Math.round(p.at / 1000);
           }
           return it;
         };

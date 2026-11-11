@@ -233,7 +233,7 @@ export function seriesView(t, info, item) {
       },
       { type: 'spacer', height: 10 },
       {
-        type: 'list', id: 'episodes', weight: 1, items: '{{state.episodes}}', focus: 'row', itemHeight: 70,
+        type: 'list', id: 'episodes', weight: 1, items: '{{state.episodes}}', focus: 'row', itemHeight: 88,
         background: 'panel', radius: 12, padding: 8, autofocus: true,
         // The episode to carry on with (apps that know "initial" for autofocus start there).
         initial: info.start?.episode,
@@ -251,13 +251,20 @@ export function seriesView(t, info, item) {
             {
               type: 'column', weight: 1, children: [
                 { type: 'text', text: '{{item.title}}', style: 'body', size: 17, maxLines: 1 },
-                { type: 'text', text: '{{item.description}}', style: 'soft', size: 13, maxLines: 1 },
-                // How far you got in a started episode, and what OK does.
-                { type: 'progress', value: '{{item.progress}}', when: '{{item.progress}}', padding: [0, 6, 40, 0] },
-                { type: 'text', text: t('▶ Resume from {time}', { time: '{{item.resumeLabel}}' }), style: 'soft', size: 13, maxLines: 1, padding: [0, 4, 0, 0], when: '{{item.resumeLabel}}' },
+                { type: 'text', text: '{{item.description}}', style: 'soft', size: 13, maxLines: 1, unless: '{{item.resume}}' },
+                // A started episode, like its card in the history: who started it and when, what is left, how far.
+                {
+                  type: 'row', align: 'center', padding: [0, 4, 0, 0], when: '{{item.resume}}', children: [
+                    { type: 'text', text: '{{item.startedBy}}  ·  ', style: 'soft', size: 13, when: '{{item.startedBy}}' },
+                    { type: 'time', value: '{{item.lastAt}}', format: 'datetime', style: 'soft', size: 13, when: '{{item.lastAt}}' },
+                    { type: 'text', text: '      {{item.left}}', style: 'soft', size: 13, when: '{{item.left}}' },
+                  ],
+                },
+                { type: 'progress', value: '{{item.progress}}', when: '{{item.progress}}', width: 360, padding: [0, 8, 0, 0] },
               ],
             },
-            { type: 'text', text: t('{m} min', { m: '{{item.minutes}}' }), style: 'soft', size: 13, when: '{{item.minutes}}' },
+            { type: 'text', text: t('Resume'), style: 'body', size: 14, padding: [0, 0, 6, 0], when: '{{item.resume}}' },
+            { type: 'text', text: t('{m} min', { m: '{{item.minutes}}' }), style: 'soft', size: 13, when: '{{item.minutes}}', unless: '{{item.resume}}' },
             // Seen.
             { type: 'text', text: '✓', color: 'accent', bold: true, size: 20, padding: [14, 0, 0, 0], when: '{{item.seen}}' },
           ],
