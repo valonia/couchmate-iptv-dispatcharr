@@ -524,18 +524,13 @@ ${rows ? `<section class="card wide"><h3>Channels with the most filled in</h3><d
           if (p.seen) it.seen = true;
           else if (p.started) {
             it.resume = p.position; // OK on it carries on where you were
+            it.resumeLabel = clock(p.position);
             if (p.duration) it.progress = Math.min(1, p.position / p.duration).toFixed(3);
           }
           return it;
         };
         // Where to carry on: the episode you were in the middle of, else the first one after the last you saw.
         const target = progress.target();
-        const buttons = !target ? [] : target.paused ? [
-          { id: 'continue', label: api.t('▶ Continue {episode} · {time}', { episode: target.e.label, time: clock(target.position) }), play: episode(target.e), position: target.position },
-          { id: 'restart', label: api.t('↺ Start over'), play: episode(target.e), position: 0 },
-        ] : [
-          { id: 'next', label: api.t('▶ Play {episode}', { episode: target.e.label }), play: episode(target.e), position: 0 },
-        ];
         return seriesView(api.t, {
           seasons: info.seasons.map((x) => ({
             id: String(x.season),
@@ -543,7 +538,6 @@ ${rows ? `<section class="card wide"><h3>Channels with the most filled in</h3><d
             items: x.episodes.map(episode),
           })),
           start: target ? { season: String(target.season), episode: target.e.id } : null,
-          buttons,
         }, item);
       }
       return message(api.t('Nothing here.'));

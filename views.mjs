@@ -206,13 +206,12 @@ export function postersView(t, menu, groups) {
 }
 
 /**
- * A series: info panel, "continue" buttons, favourite button, seasons and the season's episodes (seen ones
- * ticked, started ones with how far). It opens on the season and episode to carry on with (info.start).
+ * A series: info panel, favourite button, seasons and the season's episodes (seen ones ticked, a started one
+ * with how far and "continue"). It opens on the season and episode to carry on with (info.start).
  */
 export function seriesView(t, info, item) {
   const seasons = info.seasons.filter((s) => s.items.length);
   const start = seasons.find((s) => s.id === info.start?.season) || seasons[0];
-  const buttons = info.buttons || [];
   return {
     type: 'column',
     state: { season: start?.id || null, episodes: start?.items || [] },
@@ -221,12 +220,6 @@ export function seriesView(t, info, item) {
       { type: 'spacer', height: 14 },
       {
         type: 'row', gap: 6, align: 'center', children: [
-          // ▶ Continue S1 E3 · 12:34 / ↺ Start over (or ▶ Play the next one) – focused when the page opens.
-          buttons.length > 0 && {
-            type: 'list', id: 'continue', direction: 'horizontal', items: buttons, focus: 'pill', gap: 6, autofocus: true,
-            onClick: { play: '{{item.play}}', position: '{{item.position}}' },
-            item: { type: 'text', text: '{{item.label}}' },
-          },
           { type: 'button', text: t('☆ Add to favorites'), onClick: { favorite: '{{view.item}}' }, unless: '{{view.item.$favorite}}' },
           { type: 'button', text: t('★ Favorite'), selected: true, onClick: { favorite: '{{view.item}}' }, when: '{{view.item.$favorite}}' },
           { type: 'text', text: t('New: {episode}', { episode: '{{view.item.$newLabel}}' }), color: 'accent', bold: true, size: 15, padding: [10, 8, 10, 8], when: '{{view.item.$newCount}}' },
@@ -241,12 +234,13 @@ export function seriesView(t, info, item) {
       { type: 'spacer', height: 10 },
       {
         type: 'list', id: 'episodes', weight: 1, items: '{{state.episodes}}', focus: 'row', itemHeight: 70,
-        background: 'panel', radius: 12, padding: 8, autofocus: buttons.length === 0,
-        // Down from the buttons lands on the episode to carry on with.
+        background: 'panel', radius: 12, padding: 8, autofocus: true,
+        // The episode to carry on with (apps that know "initial" for autofocus start there).
         initial: info.start?.episode,
         empty: t('No episodes found'),
-        // A started episode carries on where you were.
+        // A started episode carries on where you were; holding OK starts it over.
         onClick: { play: '{{item}}', position: '{{item.resume}}' },
+        onLongClick: { play: '{{item}}', position: 0 },
         item: {
           type: 'row', align: 'center', children: [
             { type: 'text', text: '{{item.subtitle}}', style: 'soft', size: 15, width: 96, maxLines: 1 },
@@ -256,8 +250,9 @@ export function seriesView(t, info, item) {
               type: 'column', weight: 1, children: [
                 { type: 'text', text: '{{item.title}}', style: 'body', size: 17, maxLines: 1 },
                 { type: 'text', text: '{{item.description}}', style: 'soft', size: 13, maxLines: 1 },
-                // How far you got in a started episode.
+                // How far you got in a started episode, and what OK does.
                 { type: 'progress', value: '{{item.progress}}', when: '{{item.progress}}', padding: [0, 6, 40, 0] },
+                { type: 'text', text: t('▶ Continue {time} · hold OK to start over', { time: '{{item.resumeLabel}}' }), color: 'accent', size: 13, maxLines: 1, padding: [0, 4, 0, 0], when: '{{item.resumeLabel}}' },
               ],
             },
             { type: 'text', text: t('{m} min', { m: '{{item.minutes}}' }), style: 'soft', size: 13, when: '{{item.minutes}}' },
