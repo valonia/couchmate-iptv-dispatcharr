@@ -277,6 +277,43 @@ export default function setup(api) {
     duration: e.duration,
   });
 
+  /** 754 → "12:34", 3754 → "1:02:34". */
+  const clock = (sec) => {
+    const s = Math.max(0, Math.round(sec));
+    const two = (n) => String(n).padStart(2, '0');
+    return s >= 3600 ? `${Math.floor(s / 3600)}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}` : `${Math.floor(s / 60)}:${two(s % 60)}`;
+  };
+
+  /**
+   * How far the room got in a series' episodes (the server keeps it for every plugin – api.watched).
+   * Seen = to the last few minutes (the credits); started = at least half a minute in.
+   */
+  function watchProgress(info) {
+    const all = info.seasons.flatMap((x) => x.episodes.map((e) => ({ e, season: x.season })));
+    const w = typeof api.watched === 'function' ? api.watched(all.map(({ e }) => e.id)) : {};
+    const of = (e) => {
+      const x = w[e.id];
+      if (!x) return { seen: false, started: false, position: 0, duration: e.duration || 0, at: 0 };
+      const duration = x.duration || e.duration || 0;
+      const seen = x.finished || (duration > 0 && duration - x.position <= Math.min(300, duration * 0.08));
+      return { seen, started: !seen && x.position >= 30, position: Math.round(x.position), duration, at: x.at || 0 };
+    };
+    return {
+      of,
+      target() {
+        // The one you were in the middle of most recently.
+        const paused = all.map((a) => ({ ...a, p: of(a.e) })).filter((a) => a.p.started).sort((a, b) => b.p.at - a.p.at)[0];
+        if (paused) return { e: paused.e, season: paused.season, paused: true, position: paused.p.position };
+        // Otherwise the first episode after the last one you saw (extras left out).
+        const main = all.filter((a) => a.season);
+        let last = -1;
+        main.forEach((a, i) => { if (of(a.e).seen) last = i; });
+        const next = last >= 0 ? main[last + 1] : null;
+        return next ? { e: next.e, season: next.season, paused: false, position: 0 } : null;
+      },
+    };
+  }
+
   /** The episode after this one (continues with the next season after the last episode). */
   async function nextEpisode(id) {
     const m = /^episode:([^:]+):[^:]+:([A-Za-z0-9_-]{1,64})$/.exec(id);
@@ -480,12 +517,33 @@ ${rows ? `<section class="card wide"><h3>Channels with the most filled in</h3><d
         if (!m) return message(api.t('Nothing here.'));
         const info = await seriesInfo(m[1]);
         const item = { id: params.id, kind: 'series', action: 'open', view: 'show', title: info.title, image: info.image, backdrop: info.backdrop, description: info.description, year: info.year, genre: info.genre, rating: info.rating };
+        const progress = watchProgress(info);
+        const episode = (e) => {
+          const it = { ...episodeItem(info, e), minutes: e.duration ? Math.max(1, Math.round(e.duration / 60)) : null };
+          const p = progress.of(e);
+          if (p.seen) it.seen = true;
+          else if (p.started) {
+            it.resume = p.position; // OK on it carries on where you were
+            if (p.duration) it.progress = Math.min(1, p.position / p.duration).toFixed(3);
+          }
+          return it;
+        };
+        // Where to carry on: the episode you were in the middle of, else the first one after the last you saw.
+        const target = progress.target();
+        const buttons = !target ? [] : target.paused ? [
+          { id: 'continue', label: api.t('▶ Continue {episode} · {time}', { episode: target.e.label, time: clock(target.position) }), play: episode(target.e), position: target.position },
+          { id: 'restart', label: api.t('↺ Start over'), play: episode(target.e), position: 0 },
+        ] : [
+          { id: 'next', label: api.t('▶ Play {episode}', { episode: target.e.label }), play: episode(target.e), position: 0 },
+        ];
         return seriesView(api.t, {
           seasons: info.seasons.map((x) => ({
             id: String(x.season),
             title: x.season ? api.t('Season {n}', { n: x.season }) : api.t('Extras'),
-            items: x.episodes.map((e) => ({ ...episodeItem(info, e), minutes: e.duration ? Math.max(1, Math.round(e.duration / 60)) : null })),
+            items: x.episodes.map(episode),
           })),
+          start: target ? { season: String(target.season), episode: target.e.id } : null,
+          buttons,
         }, item);
       }
       return message(api.t('Nothing here.'));
