@@ -1,7 +1,7 @@
 {
   "id": "iptv",
   "name": "IPTV",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "description": "Live TV with a programme guide, movies and series from Dispatcharr (Xtream). Search, reminders, the next episode and a merged programme guide.",
   "main": "index.mjs",
   "repository": "valonia/couchmate-iptv-dispatcharr",

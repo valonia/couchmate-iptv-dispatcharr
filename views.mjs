@@ -238,9 +238,11 @@ export function seriesView(t, info, item) {
         // The episode to carry on with (apps that know "initial" for autofocus start there).
         initial: info.start?.episode,
         empty: t('No episodes found'),
-        // A started episode carries on where you were; holding OK starts it over.
+        // A started episode carries on where you were. "Start over" next to its row (apps without row buttons:
+        // hold OK).
         onClick: { play: '{{item}}', position: '{{item.resume}}' },
         onLongClick: { play: '{{item}}', position: 0 },
+        buttons: [{ text: t('↺ Start over'), onClick: { play: '{{item}}', position: 0 }, when: '{{item.resume}}' }],
         item: {
           type: 'row', align: 'center', children: [
             { type: 'text', text: '{{item.subtitle}}', style: 'soft', size: 15, width: 96, maxLines: 1 },
@@ -252,7 +254,7 @@ export function seriesView(t, info, item) {
                 { type: 'text', text: '{{item.description}}', style: 'soft', size: 13, maxLines: 1 },
                 // How far you got in a started episode, and what OK does.
                 { type: 'progress', value: '{{item.progress}}', when: '{{item.progress}}', padding: [0, 6, 40, 0] },
-                { type: 'text', text: t('▶ Continue {time} · hold OK to start over', { time: '{{item.resumeLabel}}' }), color: 'accent', size: 13, maxLines: 1, padding: [0, 4, 0, 0], when: '{{item.resumeLabel}}' },
+                { type: 'text', text: t('▶ Resume from {time}', { time: '{{item.resumeLabel}}' }), style: 'soft', size: 13, maxLines: 1, padding: [0, 4, 0, 0], when: '{{item.resumeLabel}}' },
               ],
             },
             { type: 'text', text: t('{m} min', { m: '{{item.minutes}}' }), style: 'soft', size: 13, when: '{{item.minutes}}' },
