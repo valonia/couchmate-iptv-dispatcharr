@@ -210,11 +210,15 @@ export default function setup(api) {
     const nowSec = Date.now() / 1000;
     const wanted = ids.map((id) => [id, liveId(id)]).filter(([, sid]) => sid).slice(0, 200);
     const lists = await mapLimit(wanted, 12, ([, sid]) => shortEpg(sid));
+    const names = await channelNames();
     const out = {};
+    const empty = [];
     wanted.forEach(([id], k) => {
-      const l = (lists[k] || []).filter((e) => e.end > nowSec).sort((a, b) => a.start - b.start).slice(0, 4);
+      const l = realOnly(lists[k], names.get(id)).filter((e) => e.end > nowSec).sort((a, b) => a.start - b.start).slice(0, 4);
       if (l.length) out[id] = l;
+      else empty.push(id);
     });
+    if (empty.length) Object.assign(out, await guessedGuide(empty));
     return out;
   }
 
@@ -223,7 +227,73 @@ export default function setup(api) {
     const sid = liveId(id);
     if (!sid) return [];
     const nowSec = Date.now() / 1000;
-    return (await shortEpg(sid, 200)).filter((e) => e.end > nowSec).slice(0, 120);
+    const real = realOnly(await shortEpg(sid, 200), (await channelNames()).get(id)).filter((e) => e.end > nowSec).slice(0, 120);
+    return real.length ? real : ((await guessedGuide([id]))[id] || []);
+  }
+
+  const channelNames = async () => new Map((await catalog('live').catch(() => [])).map((e) => [e.item.id, e.item.title]));
+
+  /**
+   * Dispatcharr fills channels without a guide with blocks named after the channel ("dummy" programmes). Those
+   * say nothing – left out, so the channel counts as having no guide.
+   */
+  function realOnly(list, channelName) {
+    // NFC: "ä" can come as one character or as "a" + two dots – they look the same but would not compare equal.
+    const plain = (v) => str(v).normalize('NFC').trim().toLowerCase();
+    const name = plain(channelName);
+    const l = list || [];
+    if (!name || !l.length) return l;
+    // Every one of its blocks carries the channel's name as title (with a made-up line as description, e.g.
+    // "Early Bird Special"). A real guide never names every programme after the channel.
+    return l.every((e) => plain(e.title) === name) ? [] : l;
+  }
+
+  // A channel with no programme information at all gets a little from its name – only then, so a real guide
+  // always wins (and it can be switched off): "N1 PPV SE [18:50 Tranås AIF - Kungälvs IK]" → that match at
+  // 18:50, "24/7 Leif och Billy SE" → Leif och Billy all day.
+
+  /** Seconds since 1970 for hh:mm today in the provider's time zone (tomorrow if that was over 12 h ago). */
+  function zonedTime(h, m, tz) {
+    const now = Date.now();
+    let p;
+    try {
+      p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+        .formatToParts(new Date(now)).map((x) => [x.type, x.value]));
+    } catch { return null; } // an unknown time zone
+    const offset = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - Math.floor(now / 60000) * 60000;
+    let t = Date.UTC(+p.year, +p.month - 1, +p.day, h, m) - offset;
+    if (t < now - 12 * 3600 * 1000) t += 24 * 3600 * 1000;
+    return Math.round(t / 1000);
+  }
+
+  /** The show of a 24/7 channel: "24/7 Leif och Billy FHD SE [Multi-Sub]" → "Leif och Billy". */
+  const showOf = (name) => str(name).replace(/^24\/7\s*/i, '').replace(/\[[^\]]*\]/g, ' ')
+    .replace(/(\s+(FHD|UHD|HD|SD|4K|SE|NO|DK|FI|UK|US|[A-Z]{2}))+\s*$/, '').replace(/\s{2,}/g, ' ').trim();
+
+  async function guessedGuide(ids) {
+    if (s.guessGuide === false) return {};
+    const names = await channelNames();
+    const tz = str(s.guideTimeZone) || 'Europe/Stockholm';
+    const nowSec = Math.floor(Date.now() / 1000);
+    const out = {};
+    for (const id of ids) {
+      const name = str(names.get(id));
+      const event = /\[(\d{1,2})[:.](\d{2})\s+([^\]]+)\]/.exec(name);
+      if (event) {
+        const start = zonedTime(Number(event[1]), Number(event[2]), tz);
+        if (start) {
+          const end = start + 150 * 60; // matches and events: about two and a half hours
+          if (end > nowSec) out[id] = [{ title: clean(event[3], 200), description: null, start, end }];
+        }
+        continue;
+      }
+      if (/^24\/7\s/i.test(name)) {
+        const show = showOf(name);
+        const start = nowSec - (nowSec % 3600);
+        if (show) out[id] = [{ title: show, description: null, start, end: start + 24 * 3600 }];
+      }
+    }
+    return out;
   }
 
   // ---------------------------------------------------------------- series

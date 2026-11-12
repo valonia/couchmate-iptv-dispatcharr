@@ -1,7 +1,7 @@
 {
   "id": "iptv",
   "name": "IPTV",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "Live TV with a programme guide, movies and series from Dispatcharr (Xtream). Search, reminders, the next episode and a merged programme guide.",
   "main": "index.mjs",
   "repository": "valonia/couchmate-iptv-dispatcharr",
@@ -27,6 +27,8 @@
       "help": "{CC} is replaced by the country code, e.g. SE." },
     { "key": "epgFallbackUrl", "label": "Merged guide: extra fallback sources", "type": "text", "default": "", "help": "More XMLTV links, separated by commas." },
     { "key": "epgFallbackMap", "label": "Merged guide: manual channel mappings", "type": "text", "default": "", "help": "primaryid=fallbackid, separated by commas." },
-    { "key": "epgMergeHours", "label": "Merged guide: rebuild every (hours)", "type": "number", "default": 3 }
+    { "key": "epgMergeHours", "label": "Merged guide: rebuild every (hours)", "type": "number", "default": 3 },
+    { "key": "guessGuide", "label": "Guide from channel names when there is none", "type": "bool", "default": true, "help": "Only for channels with no programme information at all – a real guide always wins. Event channels such as \"PPV [18:50 Team A - Team B]\" show that event at that time, 24/7 channels show their show." },
+    { "key": "guideTimeZone", "label": "Time zone of the times in channel names", "type": "text", "default": "Europe/Stockholm", "help": "For event channels with a time in their name, e.g. Europe/Stockholm or Europe/London." }
   ]
 }
