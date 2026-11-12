@@ -131,10 +131,20 @@ export default function setup(api) {
   // ---------------------------------------------------------------- the whole catalogue (search, zapping)
 
   const lists = new Map(); // kind → { t, list, loading }
+  /**
+   * Every channel, film or series (for search and channel names). Once it has been read, an older list is given
+   * straight away while a fresh one is read in the background – reading 27 000 films takes a while, and nobody
+   * should wait for it in the middle of a search.
+   */
   async function catalog(kind) {
     const hit = lists.get(kind);
     if (hit?.list && Date.now() - hit.t < SEARCH_TTL) return hit.list;
+    if (hit?.list) { if (!hit.loading) refreshCatalog(kind, hit).catch(() => {}); return hit.list; }
     if (hit?.loading) return hit.loading;
+    return refreshCatalog(kind, hit);
+  }
+
+  function refreshCatalog(kind, hit) {
     const loading = (async () => {
       const list = asArray(await xtream({ action: KINDS[kind].items })).map((x) => {
         const item = toItem[kind](x);
@@ -144,13 +154,15 @@ export default function setup(api) {
       return list;
     })();
     lists.set(kind, { ...hit, loading });
-    try {
-      return await loading;
-    } catch (e) {
-      lists.delete(kind);
+    return loading.catch((e) => {
+      // Keep an older list if there is one; else forget it so the next search tries again.
+      if (hit?.list) lists.set(kind, { t: hit.t, list: hit.list }); else lists.delete(kind);
       throw e;
-    }
+    });
   }
+  // Read them shortly after start, so the first search does not wait for it.
+  const warmCatalogs = setTimeout(() => { if (configured) for (const k of Object.keys(KINDS)) catalog(k).catch(() => {}); }, 20 * 1000);
+  warmCatalogs.unref?.();
 
   function rank(key, words, phrase) {
     if (!words.every((w) => key.includes(w))) return -1;
