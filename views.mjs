@@ -292,8 +292,8 @@ export function filmView(t, item, p) {
       {
         type: 'row', gap: 8, align: 'center', children: [
           started
-            ? { type: 'button', text: t('▶ Continue from {time}', { time: p.label }), onClick: { play: '{{view.item}}', position: p.position } }
-            : { type: 'button', text: t('▶ Play'), onClick: { play: '{{view.item}}' } },
+            ? { type: 'button', text: t('▶ Continue from {time}', { time: p.label }), autofocus: true, onClick: { play: '{{view.item}}', position: p.position } }
+            : { type: 'button', text: t('▶ Play'), autofocus: true, onClick: { play: '{{view.item}}' } },
           started && { type: 'button', text: t('↺ Start over'), onClick: { play: '{{view.item}}', position: 0 } },
           { type: 'button', text: t('☆ Add to favorites'), onClick: { favorite: '{{view.item}}' }, unless: '{{view.item.$favorite}}' },
           { type: 'button', text: t('★ Favorite'), selected: true, onClick: { favorite: '{{view.item}}' }, when: '{{view.item.$favorite}}' },
