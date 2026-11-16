@@ -189,7 +189,8 @@ export function postersView(t, menu, groups) {
             type: 'grid', id: 'posters', weight: 1, items: '{{item.items}}', minWidth: 92, gap: 18, focus: 'poster', aspect: 0.6667, padding: [6, 12, 6, 24],
             label: '{{item.title}}',
             onFocus: { set: { focused: '{{item}}' } },
-            onClick: opens ? { open: 'show', params: { id: '{{item.id}}' } } : { play: '{{item}}' },
+            // Series open their episodes, films their info page (play, continue, start over).
+            onClick: opens ? { open: 'show', params: { id: '{{item.id}}' } } : { open: 'film', params: { id: '{{item.id}}' } },
             onLongClick: { favorite: '{{item}}' },
             item: {
               type: 'box', children: [
@@ -273,6 +274,75 @@ export function seriesView(t, info, item) {
     ],
     // The series itself, for the info panel and the favourite button.
     view: { item },
+  };
+}
+
+/**
+ * A film: the info panel, then Play – or, when the room has started it, "Continue from 34:10" and "Start over"
+ * with who started it, when and what is left. Play on what already plays opens it in fullscreen (the apps
+ * handle that), "Start over" always starts it from the beginning.
+ */
+export function filmView(t, item, p) {
+  const started = Boolean(p?.started);
+  return {
+    type: 'column',
+    children: [
+      bigHero('view.item'),
+      { type: 'spacer', height: 18 },
+      {
+        type: 'row', gap: 8, align: 'center', children: [
+          started
+            ? { type: 'button', text: t('▶ Continue from {time}', { time: p.label }), onClick: { play: '{{view.item}}', position: p.position } }
+            : { type: 'button', text: t('▶ Play'), onClick: { play: '{{view.item}}' } },
+          started && { type: 'button', text: t('↺ Start over'), onClick: { play: '{{view.item}}', position: 0 } },
+          { type: 'button', text: t('☆ Add to favorites'), onClick: { favorite: '{{view.item}}' }, unless: '{{view.item.$favorite}}' },
+          { type: 'button', text: t('★ Favorite'), selected: true, onClick: { favorite: '{{view.item}}' }, when: '{{view.item.$favorite}}' },
+          p?.seen && { type: 'text', text: t('✓ Seen'), color: 'accent', bold: true, size: 15, padding: [10, 8, 10, 8] },
+        ].filter(Boolean),
+      },
+      started && {
+        type: 'column', padding: [14, 4, 0, 0], children: [
+          {
+            type: 'row', align: 'center', children: [
+              p.by && { type: 'text', text: t('{name} started it', { name: p.by }) + '  ·  ', style: 'soft', size: 14 },
+              p.at && { type: 'time', value: p.at, format: 'datetime', style: 'soft', size: 14 },
+              p.left && { type: 'text', text: '      ' + p.left, style: 'soft', size: 14 },
+            ].filter(Boolean),
+          },
+          p.progress && { type: 'progress', value: p.progress, width: 420, padding: [0, 8, 0, 0] },
+        ].filter(Boolean),
+      },
+    ].filter(Boolean),
+    view: { item },
+  };
+}
+
+/** A taller info panel for one film: backdrop, poster, title, facts, the whole description, director and cast. */
+function bigHero(path) {
+  const v = (field) => `{{${path}.${field}}}`;
+  return {
+    type: 'box', height: 360, width: 'fill', background: 'panel', radius: 12, children: [
+      { type: 'image', src: `{{${path}.backdrop || ${path}.image}}`, fit: 'cover', align: 'centerEnd', width: '70%', height: 'fill', opacity: 0.6 },
+      { type: 'box', width: 'fill', height: 'fill', background: 'heroFade' },
+      {
+        type: 'row', padding: 24, height: 'fill', children: [
+          { type: 'image', src: v('image'), fallback: v('title'), fit: 'cover', aspect: 0.6667, height: 'fill', radius: 8 },
+          { type: 'spacer', width: 28 },
+          {
+            type: 'column', weight: 1, padding: [0, 6, 0, 0], children: [
+              { type: 'text', text: v('title'), style: 'title', maxLines: 2 },
+              { type: 'spacer', height: 6 },
+              { type: 'text', join: [v('year'), v('genre'), v('length'), `★ ${v('rating')}`], color: 'gold', size: 15 },
+              { type: 'spacer', height: 12 },
+              { type: 'text', text: v('description'), style: 'dim', size: 15, maxLines: 6 },
+              { type: 'spacer', height: 10 },
+              { type: 'text', text: v('director'), style: 'soft', size: 14, maxLines: 1, when: v('director') },
+              { type: 'text', text: v('cast'), style: 'soft', size: 14, maxLines: 2, when: v('cast') },
+            ],
+          },
+        ],
+      },
+    ],
   };
 }
 

@@ -15,7 +15,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { SharedVod } from './sharedvod.mjs';
 import { buildMergedEpg } from './epgmerge.mjs';
-import { liveView, postersView, seriesView, liveOverlay } from './views.mjs';
+import { liveView, postersView, seriesView, filmView, liveOverlay } from './views.mjs';
 
 const ICONS = {
   live: 'M21 6h-7.59l3.29-3.29L16 2l-4 4-4-4-.71.71L10.59 6H3c-1.1 0-2 .89-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.11-.9-2-2-2zm0 14H3V8h18v12zM9 10v8l7-4z',
@@ -106,7 +106,7 @@ export default function setup(api) {
       image: img(x.stream_icon), number: Number(x.num) || null,
     }),
     movies: (x) => ({
-      id: `movie:${str(x.stream_id)}:${EXT.test(str(x.container_extension)) ? x.container_extension : 'mp4'}`, kind: 'movie',
+      id: `movie:${str(x.stream_id)}:${EXT.test(str(x.container_extension)) ? x.container_extension : 'mp4'}`, kind: 'movie', action: 'open', view: 'film',
       title: cleanTitle(clean(x.name, 200)), image: img(x.stream_icon), description: clean(x.plot, 1000) || null,
       year: clean(x.year, 8) || (/[\[(]((?:19|20)\d{2})[\])]/.exec(str(x.name)) || [])[1] || null, genre: clean(x.genre, 100) || null, rating: rating(x.rating),
     }),
@@ -628,6 +628,44 @@ ${rows ? `<section class="card wide"><h3>Channels with the most filled in</h3><d
           })),
           start: target ? { season: String(target.season), episode: target.e.id } : null,
         }, item);
+      }
+      if (id === 'film') {
+        const m = /^movie:([A-Za-z0-9_-]{1,64}):([A-Za-z0-9]{1,8})$/.exec(str(params.id));
+        if (!m) return message(api.t('Nothing here.'));
+        const hit = (await catalog('movies').catch(() => [])).find((e) => e.item.id === params.id)?.item;
+        // More about the film (backdrop, length, director, cast) – the view works without it.
+        const d = await xtream({ action: 'get_vod_info', vod_id: m[1] }).catch(() => null);
+        const i = d?.info || {};
+        const seconds = Number(i.duration_secs) || 0;
+        const director = clean(i.director, 200);
+        const cast = clean(i.cast || i.actors, 400);
+        const item = {
+          id: params.id, kind: 'movie', action: 'open', view: 'film',
+          title: hit?.title || cleanTitle(clean(d?.movie_data?.name || i.name, 200)) || api.t('Film'),
+          image: hit?.image || img(i.movie_image || i.cover_big),
+          backdrop: img(asArray(i.backdrop_path)[0]) || null,
+          description: clean(i.plot || i.description, 1500) || hit?.description || null,
+          year: hit?.year || clean(i.releasedate || i.release_date, 10).slice(0, 4) || null,
+          genre: hit?.genre || clean(i.genre, 100) || null,
+          rating: hit?.rating || rating(i.rating),
+          length: seconds ? (seconds >= 3600 ? api.t('{h} h {m} min', { h: Math.floor(seconds / 3600), m: Math.round(seconds / 60) % 60 }) : api.t('{m} min', { m: Math.round(seconds / 60) })) : null,
+          director: director ? api.t('Director: {name}', { name: director }) : null,
+          cast: cast ? api.t('Cast: {names}', { names: cast }) : null,
+        };
+        // How far the room got (the same rules as for episodes).
+        const film = { id: params.id, duration: seconds };
+        const progress = watchProgress({ seasons: [{ season: 1, episodes: [film] }] }).of(film);
+        let p = null;
+        if (progress.seen) p = { seen: true };
+        else if (progress.started) {
+          p = { started: true, position: progress.position, label: clock(progress.position), by: progress.by, at: progress.at ? Math.round(progress.at / 1000) : null };
+          if (progress.duration) {
+            p.progress = Math.min(1, progress.position / progress.duration).toFixed(3);
+            const left = Math.max(1, Math.round((progress.duration - progress.position) / 60));
+            p.left = left >= 60 ? api.t('{h} h {m} min remaining', { h: Math.floor(left / 60), m: left % 60 }) : api.t('{m} min remaining', { m: left });
+          }
+        }
+        return filmView(api.t, item, p);
       }
       return message(api.t('Nothing here.'));
     },
